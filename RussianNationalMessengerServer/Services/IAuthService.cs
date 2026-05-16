@@ -4,5 +4,5 @@ namespace RussianNationalMessengerServer.Services;
 
 public interface IAuthService
 {
-    string GenerateJwtToken(User user);
+    string GenerateJwtToken(Account user);
 }

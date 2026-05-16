@@ -1,6 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.EntityFrameworkCore;
+using MongoDB.Driver;
 using RussianNationalMessengerServer.Dtos;
 using RussianNationalMessengerServer.Models;
 using System.Collections.Concurrent;
@@ -11,28 +11,27 @@ namespace RussianNationalMessengerServer.Services;
 [Authorize]
 public class RNMHub : Hub
 {
-    private readonly IDbContextFactory<RNMContext> _dbFactory;
+    //private readonly IDbContextFactory<RNMContext> _dbFactory;
 
     // username -> connection devices ConnectionId
     private static readonly ConcurrentDictionary<string, List<string>> _connections = [];
+    private readonly MongoService _context;
 
-    public RNMHub(IDbContextFactory<RNMContext> dbFactory) =>
-        _dbFactory = dbFactory;
+    public RNMHub(MongoService context) =>
+        _context = context;
 
     public override async Task OnConnectedAsync()
     {
         // Получаем UserId из JWT
-        var username = Context.User?.FindFirst(ClaimTypes.Name)?.Value;
+        var user_id = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-        if (string.IsNullOrEmpty(username))
+        if (string.IsNullOrEmpty(user_id))
         {
             Context.Abort();
             return;
         }
 
-        await using var dbContext = await _dbFactory.CreateDbContextAsync();
-
-        var user = await dbContext.Users.FirstOrDefaultAsync(x => x.Username == username);
+        var user = await _context.Accounts.Find(x => x.Id == user_id).FirstOrDefaultAsync();
 
         if (user == null)
         {
@@ -40,10 +39,9 @@ public class RNMHub : Hub
             return;
         }
 
-        user.IsOnline = true;
-        await dbContext.SaveChangesAsync();
+        await _context.Accounts.UpdateOneAsync(x => x.Id == user.Id, Builders<Account>.Update.Set(x => x.IsOnline, true));
 
-        _connections.AddOrUpdate(username,
+        _connections.AddOrUpdate(user_id,
             _ => [Context.ConnectionId],
             (_, list) =>
             {
@@ -51,73 +49,53 @@ public class RNMHub : Hub
                 return list;
             });
 
+        List<Chat> userChats = await _context.Chats.Find(x => x.Members.Contains(user_id)).ToListAsync();
 
-        var userChatMembers = await dbContext.ChatMembers.Where(x => x.Username == user.Username).ToListAsync();
-
-        foreach (var chat in userChatMembers)
+        foreach (var chat in userChats)
         {
-            await Groups.AddToGroupAsync(Context.ConnectionId, chat.ChatId.ToString());
+            await Groups.AddToGroupAsync(Context.ConnectionId, chat.Id);
         }
 
-        var userChats = await dbContext.Chats.Where(x => x.ChatMembers.Any(y => y.Username == username)).ToListAsync();
-        List<ChatMessagesDto> chatMessagesDto = [];
-
-        foreach (var item in userChats)
+        List<ChatMessagesDto> chatMessages = [.. userChats.Select(x => new ChatMessagesDto
         {
-            chatMessagesDto.Add(new()
-            {
-                Chat = item,
-                Messages = [.. dbContext.Messages.Where(x => x.ChatId == item.Id).OrderByDescending(x => x.SentAt)]//Take(30)
-            });
-        }
+            Chat = x,
+            Messages = _context.Messages.Find(x => x.ChatId == x.Id).SortByDescending(x => x.SentAt).ToList()//.Limit(50)
+        })];
 
-        if (chatMessagesDto.Count > 0)
+        if (chatMessages.Count > 0)
         {
-            await Clients.Client(Context.ConnectionId).SendAsync("OnChatMessages", chatMessagesDto);
+            await Clients.Client(Context.ConnectionId).SendAsync("OnChatMessages", chatMessages);
         }
-
         await base.OnConnectedAsync();
     }
 
-    public async Task SendMessage(Guid chatId, string content)
+    public async Task SendMessage(string chatId, string content)
     {
-        var username = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var user_id = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-        if (string.IsNullOrEmpty(username))
+        if (string.IsNullOrEmpty(user_id))
             return;
 
-        await using var db = await _dbFactory.CreateDbContextAsync();
-
         // Проверка: пользователь в чате?
-        var isMember = await db.ChatMembers
-            .AnyAsync(x => x.ChatId == chatId && x.Username == username);
+        var isMember = await _context.Chats.Find(x => x.Id == chatId && x.Members.Contains(user_id)).AnyAsync();
 
-        // написать отправку сообщения
         // что юзер не имеет доступа к этому чату
         if (!isMember)
             return;
 
         Message message = new()
         {
+            Id = Guid.NewGuid().ToString(),
             ChatId = chatId,
-            Author = username,
-            Content = content
-        };
-
-        db.Messages.Add(message);
-        await db.SaveChangesAsync();
-
-     /*   var dto = new
-        {
-            Id = message.Id,
-            ChatId = chatId,
-            Author = username,
+            Author = user_id,
             Content = content,
-            SentAt = message.SentAt
+            SentAt = DateTime.UtcNow,
         };
-     */
-        // отправка ВСЕМ в чате
-        await Clients.Group(chatId.ToString()).SendAsync("ReceiveMessage", message);
+
+        await _context.Messages.InsertOneAsync(message);
+
+        // отправка всем в чате
+        await Clients.Group(chatId).SendAsync("ReceiveMessage", message);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
@@ -134,14 +112,15 @@ public class RNMHub : Hub
             if (list.Count == 0)
             {
                 _connections.TryRemove(login, out _);
-                await using var db = await _dbFactory.CreateDbContextAsync();
-                var disconn_user = db.Users.FirstOrDefault(x => x.Username == login);
+               
+                var disconn_user = _context.Accounts.Find(x => x.Username == login).FirstOrDefault();
                 
-                if (disconn_user != null)
+                if (disconn_user is not null)
                 {
                     disconn_user.IsOnline = false;
                     //уведомить остальных что пользователь вышел из сети)
-                    await db.SaveChangesAsync();
+
+                    await _context.Accounts.UpdateOneAsync(x => x.Id == disconn_user.Id, Builders<Account>.Update.Set(x => x.IsOnline, true));
                 }
             }
         }

@@ -33,7 +33,10 @@ builder.Services.AddSwaggerGen(x =>
 
 //подключаем БД (контекст)
 //builder.Services.AddScoped<RNMContext>(x => new());
-builder.Services.AddDbContextFactory<RNMContext>();
+//builder.Services.AddDbContextFactory<RNMContext>();
+builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
+
+builder.Services.AddSingleton<MongoService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 
@@ -66,7 +69,7 @@ builder.Services.AddAuthentication(x =>
         ClockSkew = TimeSpan.Zero
     };
 
-    // ВАЖНО для SignalR!
+
     x.Events = new JwtBearerEvents
     {
         OnMessageReceived = context =>
@@ -90,7 +93,6 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    //отображаем свагу )))
     app.UseSwagger();
     app.UseSwaggerUI();
 }

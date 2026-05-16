@@ -13,14 +13,14 @@ public class AuthService : IAuthService
     public AuthService(IConfiguration configuration) =>
         _configuration = configuration;
 
-    public string GenerateJwtToken(User user)
+    public string GenerateJwtToken(Account user)
     {
         JwtSettings jwtSettings = _configuration.GetSection("JwtSettings").Get<JwtSettings>() ?? throw new ArgumentNullException("Get return null");
 
         Claim[] claims =
         [
             new(ClaimTypes.Name, user.Username),
-            new(ClaimTypes.NameIdentifier, user.Username),
+            new(ClaimTypes.NameIdentifier, user.Id),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         ];
 
