@@ -28,7 +28,7 @@ public class LoginController : ControllerBase
 
         var user = await _context.Accounts.Find(x => x.Username == loginDto.UserName && x.PasswordHash == loginDto.Password).FirstOrDefaultAsync();
 
-        if(user is null)
+        if (user is null)
             return StatusCode(401, "Неверный логин или пароль");
 
         var token = _authService.GenerateJwtToken(user);

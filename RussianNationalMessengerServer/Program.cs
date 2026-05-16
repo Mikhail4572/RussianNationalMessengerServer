@@ -28,7 +28,6 @@ builder.Services.AddSwaggerGen(x =>
     {
         [new OpenApiSecuritySchemeReference("Bearer", document)] = []
     });
-
 });
 
 //подключаем БД (контекст)

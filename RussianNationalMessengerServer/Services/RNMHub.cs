@@ -11,8 +11,6 @@ namespace RussianNationalMessengerServer.Services;
 [Authorize]
 public class RNMHub : Hub
 {
-    //private readonly IDbContextFactory<RNMContext> _dbFactory;
-
     // username -> connection devices ConnectionId
     private static readonly ConcurrentDictionary<string, List<string>> _connections = [];
     private readonly MongoService _context;
@@ -33,7 +31,7 @@ public class RNMHub : Hub
 
         var user = await _context.Accounts.Find(x => x.Id == user_id).FirstOrDefaultAsync();
 
-        if (user == null)
+        if (user is null)
         {
             Context.Abort();
             return;
@@ -120,7 +118,7 @@ public class RNMHub : Hub
                     disconn_user.IsOnline = false;
                     //уведомить остальных что пользователь вышел из сети)
 
-                    await _context.Accounts.UpdateOneAsync(x => x.Id == disconn_user.Id, Builders<Account>.Update.Set(x => x.IsOnline, true));
+                    await _context.Accounts.UpdateOneAsync(x => x.Id == disconn_user.Id, Builders<Account>.Update.Set(x => x.IsOnline, false));
                 }
             }
         }

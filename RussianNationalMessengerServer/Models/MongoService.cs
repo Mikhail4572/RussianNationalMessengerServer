@@ -6,7 +6,7 @@ public class MongoService
 {
     public MongoService(IConfiguration config)
     {
-        MongoClient client = new(config["Mongo:Connection"]);
+        MongoClient client = new(config["MongoDbSettings:ConnectionString"]);
 
         var db = client.GetDatabase("RussianNationalMessangerDB");
 
