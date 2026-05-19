@@ -27,4 +27,8 @@ public class Chat
     [BsonElement("members")]
     [JsonPropertyName("members")]
     public List<string> Members { get; set; }
+
+    [BsonElement("lastMessage")]
+    [JsonPropertyName("lastMessage")]
+    public LastMessage? LastMessage { get; set; }
 }

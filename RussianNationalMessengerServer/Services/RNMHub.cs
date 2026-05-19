@@ -47,53 +47,32 @@ public class RNMHub : Hub
                 return list;
             });
 
-        List<Chat> userChats = await _context.Chats.Find(x => x.Members.Contains(user_id)).ToListAsync();
-
-        foreach (var chat in userChats)
-        {
-            await Groups.AddToGroupAsync(Context.ConnectionId, chat.Id);
-        }
-
-        List<ChatMessagesDto> chatMessages = [.. userChats.Select(x => new ChatMessagesDto
-        {
-            Chat = x,
-            Messages = _context.Messages.Find(x => x.ChatId == x.Id).SortByDescending(x => x.SentAt).ToList()//.Limit(50)
-        })];
-
-        if (chatMessages.Count > 0)
-        {
-            await Clients.Client(Context.ConnectionId).SendAsync("OnChatMessages", chatMessages);
-        }
+     
         await base.OnConnectedAsync();
     }
 
-    public async Task SendMessage(string chatId, string content)
+    public async Task GetChats()
     {
         var user_id = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-        if (string.IsNullOrEmpty(user_id))
-            return;
-
-        // Проверка: пользователь в чате?
-        var isMember = await _context.Chats.Find(x => x.Id == chatId && x.Members.Contains(user_id)).AnyAsync();
-
-        // что юзер не имеет доступа к этому чату
-        if (!isMember)
-            return;
-
-        Message message = new()
+        if (string.IsNullOrEmpty(user_id)) 
         {
-            Id = Guid.NewGuid().ToString(),
-            ChatId = chatId,
-            Author = user_id,
-            Content = content,
-            SentAt = DateTime.UtcNow,
-        };
+            await Clients.Client(Context.ConnectionId).SendAsync("onError", new ResponseDto() 
+            {
+                Message = "вы не авторизированны",
+                Type = TypeMessage.Error
+            });
 
-        await _context.Messages.InsertOneAsync(message);
+            Context.Abort();
+            return;
+        }
 
-        // отправка всем в чате
-        await Clients.Group(chatId).SendAsync("ReceiveMessage", message);
+        var userChats = await _context.Chats.Find(x => x.Members.Contains(user_id)).ToListAsync();
+
+        foreach (var chat in userChats)
+            await Groups.AddToGroupAsync(Context.ConnectionId, chat.Id);
+
+        await Clients.Caller.SendAsync("onChats", userChats);
     }
 
     public override async Task OnDisconnectedAsync(Exception? exception)
@@ -125,4 +104,46 @@ public class RNMHub : Hub
 
         await base.OnDisconnectedAsync(exception);
     }
+
+    public async Task SendMessage(string chatId, string content)
+    {
+        var user_id = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if (string.IsNullOrEmpty(user_id))
+            return;
+
+        // Проверка: пользователь в чате?
+        var isMember = await _context.Chats.Find(x => x.Id == chatId && x.Members.Contains(user_id)).AnyAsync();
+
+        if (!isMember)
+            return;
+
+        Message message = new()
+        {
+            Id = Guid.NewGuid().ToString(),
+            ChatId = chatId,
+            Author = user_id,
+            Content = content,
+            SentAt = DateTime.UtcNow,
+            IsDeleted = false,
+            IsEdited = false
+        };
+
+        await _context.Messages.InsertOneAsync(message);
+
+        await _context.Chats.UpdateOneAsync(x => x.Id == message.ChatId,
+            Builders<Chat>.Update.Set(x => x.LastMessage, new()
+            {
+                Author = user_id,
+                Content = message.Content,
+                MessageId = message.Id,
+                SentAt = message.SentAt,
+            })
+        );
+
+        // отправка всем в чате
+        await Clients.Group(chatId).SendAsync("onMessage", message);
+    }
+
+
 }
