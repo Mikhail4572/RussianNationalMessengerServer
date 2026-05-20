@@ -146,4 +146,10 @@ public class RNMHub : Hub
     }
 
 
+    public async Task GetMessages(string chatId)
+    {
+        List<Message> messages = await _context.Messages.Find(x => x.ChatId == chatId).SortBy(x => x.SentAt).Limit(50).ToListAsync();
+
+        await Clients.Caller.SendAsync("onMessages", chatId, messages);
+    }
 }

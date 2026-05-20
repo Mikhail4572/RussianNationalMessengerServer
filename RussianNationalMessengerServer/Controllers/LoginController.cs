@@ -33,10 +33,12 @@ public class LoginController : ControllerBase
 
         var token = _authService.GenerateJwtToken(user);
 
+        user.PasswordHash = "";
+
         return Ok(new LoginResponseDto
         {
             Token = token,
-            Login = user.Username,
+            User = user,
             ExpiresAt = DateTime.Now.AddMinutes(60)
         });
     }
