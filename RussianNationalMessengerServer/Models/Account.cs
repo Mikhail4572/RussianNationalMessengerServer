@@ -27,6 +27,10 @@ public class Account
     [JsonPropertyName("createdAt")]
     public DateTime CreatedAt { get; set; }
 
+    [BsonElement("lastSeenAt")]
+    [JsonPropertyName("lastSeenAt")]
+    public DateTime LastSeenAt { get; set; }
+
     [BsonElement("isOnline")]
     [JsonPropertyName("isOnline")]
     public bool IsOnline { get; set; }

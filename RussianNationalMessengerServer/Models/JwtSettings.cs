@@ -12,7 +12,4 @@ public class JwtSettings
 
     [JsonPropertyName("Audience")]
     public string Audience { get; set; }
-
-    [JsonPropertyName("ExpirationMinutes")]
-    public int ExpirationMinutes { get; set; }
 }

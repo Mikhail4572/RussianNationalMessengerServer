@@ -20,7 +20,6 @@ public class RNMHub : Hub
 
     public override async Task OnConnectedAsync()
     {
-        // Получаем UserId из JWT
         var user_id = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
         if (string.IsNullOrEmpty(user_id))
@@ -51,6 +50,63 @@ public class RNMHub : Hub
         await base.OnConnectedAsync();
     }
 
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        var login = _connections.FirstOrDefault(x => x.Value.Contains(Context.ConnectionId)).Key;
+
+        if (string.IsNullOrEmpty(login))
+            return;
+
+        if (_connections.TryGetValue(login, out var list))
+        {
+            list.Remove(Context.ConnectionId);
+
+            if (list.Count == 0)
+            {
+                _connections.TryRemove(login, out _);
+
+                var disconn_user = _context.Accounts.Find(x => x.Username == login).FirstOrDefault();
+
+                if (disconn_user is not null)
+                {
+                    disconn_user.IsOnline = false;
+
+                    //уведомить остальных что пользователь вышел из сети
+                    await _context.Accounts.UpdateOneAsync(x => x.Id == disconn_user.Id, Builders<Account>.Update.Set(x => x.IsOnline, false));
+                }
+            }
+        }
+
+        await base.OnDisconnectedAsync(exception);
+    }
+
+    public async Task RemoveMessage(string messageId, string chatId)
+    {
+        if (!_context.Messages.Find(x => x.Id == messageId).Any())
+            return;
+
+        await _context.Messages.DeleteOneAsync(x => x.Id == messageId);
+
+        var chat = await _context.Chats.Find(x => x.Id == chatId).FirstOrDefaultAsync();
+
+        if (chat is null)
+            return;
+
+        var lastMessage = await _context.Messages.Find(x => x.ChatId == chatId).SortByDescending(x => x.SentAt).FirstOrDefaultAsync();
+
+        LastMessage? message = lastMessage is null ? null : new()
+        {
+            MessageId = lastMessage.Id,
+            Content = lastMessage.Content,
+            Author = lastMessage.Author,
+            SentAt = lastMessage.SentAt
+        };
+
+        await _context.Chats.UpdateOneAsync(x => x.Id == chatId, Builders<Chat>.Update.Set(x => x.LastMessage, message));
+
+        await Clients.Group(chat.Id).SendAsync("onRemoveMessage", chat.Id, messageId);
+    }
+
     public async Task GetChats()
     {
         var user_id = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -75,35 +131,7 @@ public class RNMHub : Hub
         await Clients.Caller.SendAsync("onChats", userChats);
     }
 
-    public override async Task OnDisconnectedAsync(Exception? exception)
-    {
-        var login = _connections.FirstOrDefault(x => x.Value.Contains(Context.ConnectionId)).Key;
 
-        if (string.IsNullOrEmpty(login))
-            return;
-
-        if (_connections.TryGetValue(login, out var list))
-        {
-            list.Remove(Context.ConnectionId);
-
-            if (list.Count == 0)
-            {
-                _connections.TryRemove(login, out _);
-
-                var disconn_user = _context.Accounts.Find(x => x.Username == login).FirstOrDefault();
-
-                if (disconn_user is not null)
-                {
-                    disconn_user.IsOnline = false;
-                    //уведомить остальных что пользователь вышел из сети)
-
-                    await _context.Accounts.UpdateOneAsync(x => x.Id == disconn_user.Id, Builders<Account>.Update.Set(x => x.IsOnline, false));
-                }
-            }
-        }
-
-        await base.OnDisconnectedAsync(exception);
-    }
 
     public async Task SendMessage(Message message)
     {
@@ -140,7 +168,6 @@ public class RNMHub : Hub
         // отправка всем в чате
         await Clients.Group(message.ChatId).SendAsync("onMessage", message);
     }
-
 
     public async Task GetMessages(string chatId)
     {

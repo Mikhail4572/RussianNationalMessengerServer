@@ -31,7 +31,7 @@ public class AuthService : IAuthService
             issuer: jwtSettings.Issuer,
             audience: jwtSettings.Audience,
             claims: claims,
-            expires: DateTime.Now.AddMinutes(jwtSettings.ExpirationMinutes),
+            expires: DateTime.Now.AddYears(100),
             signingCredentials: creds
         );
 

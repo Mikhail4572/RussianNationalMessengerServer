@@ -38,8 +38,7 @@ public class LoginController : ControllerBase
         return Ok(new LoginResponseDto
         {
             Token = token,
-            User = user,
-            ExpiresAt = DateTime.Now.AddMinutes(60)
+            User = user
         });
     }
 }

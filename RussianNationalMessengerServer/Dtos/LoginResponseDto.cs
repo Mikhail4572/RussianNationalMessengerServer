@@ -10,7 +10,4 @@ public class LoginResponseDto
 
     [JsonPropertyName("user")]
     public Account User { get; set; }
-
-    [JsonPropertyName("expiresAt")]
-    public DateTime ExpiresAt { get; set; }
 }
