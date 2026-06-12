@@ -65,15 +65,8 @@ public class RNMHub : Hub
             {
                 _connections.TryRemove(login, out _);
 
-                var disconn_user = _context.Accounts.Find(x => x.Username == login).FirstOrDefault();
-
-                if (disconn_user is not null)
-                {
-                    disconn_user.IsOnline = false;
-
-                    //уведомить остальных что пользователь вышел из сети
-                    await _context.Accounts.UpdateOneAsync(x => x.Id == disconn_user.Id, Builders<Account>.Update.Set(x => x.IsOnline, false));
-                }
+                //уведомить остальных что пользователь вышел из сети
+                await _context.Accounts.UpdateOneAsync(x => x.Id == login, Builders<Account>.Update.Set(x => x.IsOnline, false));
             }
         }
 
