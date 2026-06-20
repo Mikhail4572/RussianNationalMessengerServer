@@ -19,8 +19,9 @@ public class AuthService : IAuthService
 
         Claim[] claims =
         [
+            new(ClaimTypes.NameIdentifier, user.Username),
+            new(ClaimTypes.Email, user.Email),
             new(ClaimTypes.Name, user.Username),
-            new(ClaimTypes.NameIdentifier, user.Id),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         ];
 

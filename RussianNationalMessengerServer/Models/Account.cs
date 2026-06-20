@@ -6,12 +6,9 @@ namespace RussianNationalMessengerServer.Models;
 
 public class Account
 {
-    [BsonId]
-    [JsonPropertyName("id")]
+    //[JsonPropertyName("id")]
     //[BsonRepresentation(BsonType.ObjectId)]
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-
-    [BsonElement("username")]
+    [BsonId]
     [JsonPropertyName("username")]
     public string Username { get; set; }
 

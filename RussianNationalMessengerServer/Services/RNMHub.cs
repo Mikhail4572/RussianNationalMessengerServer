@@ -29,7 +29,7 @@ public class RNMHub : Hub
             return;
         }
 
-        var user = await _context.Accounts.Find(x => x.Id == user_id).FirstOrDefaultAsync();
+        var user = await _context.Accounts.Find(x => x.Username == user_id).FirstOrDefaultAsync();
 
         if (user is null)
         {
@@ -37,7 +37,7 @@ public class RNMHub : Hub
             return;
         }
 
-        await _context.Accounts.UpdateOneAsync(x => x.Id == user.Id, Builders<Account>.Update.Set(x => x.IsOnline, true));
+        await _context.Accounts.UpdateOneAsync(x => x.Username == user.Username, Builders<Account>.Update.Set(x => x.IsOnline, true));
 
         _connections.AddOrUpdate(user_id,
             _ => [Context.ConnectionId],
@@ -66,7 +66,7 @@ public class RNMHub : Hub
                 _connections.TryRemove(login, out _);
 
                 //уведомить остальных что пользователь вышел из сети
-                await _context.Accounts.UpdateOneAsync(x => x.Id == login, Builders<Account>.Update.Set(x => x.IsOnline, false));
+                await _context.Accounts.UpdateOneAsync(x => x.Username == login, Builders<Account>.Update.Set(x => x.IsOnline, false));
             }
         }
 
@@ -100,7 +100,7 @@ public class RNMHub : Hub
         firstMessage.Id = Guid.NewGuid().ToString();
         firstMessage.SentAt = DateTime.UtcNow;
 
-        if (_context.Accounts.Find(x => members.Contains(x.Id)).Count() != members.Length)
+        if (_context.Accounts.Find(x => members.Contains(x.Username)).Count() != members.Length)
             return;
 
         Chat chat = new()
