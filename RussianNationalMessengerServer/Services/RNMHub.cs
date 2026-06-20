@@ -97,11 +97,17 @@ public class RNMHub : Hub
         if (firstMessage is null)
             return;
 
+        members = [.. members.Distinct()];
         firstMessage.Id = Guid.NewGuid().ToString();
         firstMessage.SentAt = DateTime.UtcNow;
 
-        if (_context.Accounts.Find(x => members.Contains(x.Username)).Count() != members.Length)
+        var count = await _context.Accounts.CountDocumentsAsync(x => members.Contains(x.Username));
+
+        if (count != members.Length)
             return;
+
+        //if (_context.Accounts.Find(x => members.Contains(x.Username)).Count() != members.Length)
+        //    return;
 
         Chat chat = new()
         {
@@ -132,8 +138,8 @@ public class RNMHub : Hub
             IsEdited = false
         });
 
+        // получаем учасников чата, которые сейчас онлайн
         var onlineMembersChatConectIds = _connections.Where(x => members.Contains(x.Key)).SelectMany(x => x.Value).ToList();
-
 
         // добавляем пользователей в чат
         foreach (var member in onlineMembersChatConectIds) 
