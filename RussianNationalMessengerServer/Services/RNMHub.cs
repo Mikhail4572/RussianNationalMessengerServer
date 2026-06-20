@@ -5,6 +5,7 @@ using RussianNationalMessengerServer.Dtos;
 using RussianNationalMessengerServer.Models;
 using System.Collections.Concurrent;
 using System.Security.Claims;
+using static MongoDB.Bson.Serialization.Serializers.SerializerHelper;
 
 namespace RussianNationalMessengerServer.Services;
 
@@ -72,8 +73,27 @@ public class RNMHub : Hub
         await base.OnDisconnectedAsync(exception);
     }
 
+    public async Task DeleteChat(string chatId)
+    {
+        if (await _context.Chats.Find(x => x.Id == chatId).FirstOrDefaultAsync() is not Chat chat)
+            return;
+
+        await _context.Messages.DeleteManyAsync(x => x.ChatId == chatId);
+
+        await _context.Chats.DeleteOneAsync(x => x.Id == chatId);
+
+        var onlineMembersChatConectIds = _connections.Where(x => chat.Members.Contains(x.Key)).SelectMany(x => x.Value).ToList();
+
+        await Clients.Clients(onlineMembersChatConectIds).SendAsync("onDeleteChat", chat.Id);
+    }
+
     public async Task CreateChat(Message firstMessage, string groupName, string[] members)
     {
+        var user_id = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+        if(string.IsNullOrEmpty(user_id)) 
+            return;
+
         if (firstMessage is null)
             return;
 
@@ -93,7 +113,7 @@ public class RNMHub : Hub
             LastMessage = new()
             {
                 MessageId = firstMessage.Id,
-                Author = firstMessage.Author,
+                Author = user_id,
                 Content = firstMessage.Content,
                 SentAt = firstMessage.SentAt
             }
@@ -104,7 +124,7 @@ public class RNMHub : Hub
         await _context.Messages.InsertOneAsync(new()
         {
             Id = firstMessage.Id,
-            Author = firstMessage.Author,
+            Author = user_id,
             Content = firstMessage.Content,
             ChatId = chat.Id,
             IsDeleted = false,
@@ -127,7 +147,7 @@ public class RNMHub : Hub
         var oldChatId = firstMessage.ChatId;
         firstMessage.ChatId = chat.Id;
         // отправляем создателю чата, chatId который дал клиент, сам чат и последнее сообщение в нём
-        await Clients.Caller.SendAsync("onCreateChat", oldChatId, chat, firstMessage);
+        await Clients.Client(Context.ConnectionId).SendAsync("onCreateChat", oldChatId, chat, firstMessage);
     }
 
     public async Task GetUsersByName(string name)

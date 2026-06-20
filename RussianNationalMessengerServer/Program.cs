@@ -18,7 +18,7 @@ builder.Services.AddSwaggerGen(x =>
     x.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
-        Description = "Я авторизация хихихихихи",
+        Description = "Авторизация",
         In = ParameterLocation.Header,
         Type = SecuritySchemeType.ApiKey,
         Scheme = "Bearer"
