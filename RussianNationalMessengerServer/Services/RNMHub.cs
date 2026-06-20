@@ -127,18 +127,19 @@ public class RNMHub : Hub
             Author = user_id,
             Content = firstMessage.Content,
             ChatId = chat.Id,
+            SentAt = firstMessage.SentAt,
             IsDeleted = false,
-            IsEdited = false,
-            SentAt = firstMessage.SentAt
+            IsEdited = false
         });
 
         var onlineMembersChatConectIds = _connections.Where(x => members.Contains(x.Key)).SelectMany(x => x.Value).ToList();
 
-        onlineMembersChatConectIds.Remove(Context.ConnectionId);
 
         // добавляем пользователей в чат
         foreach (var member in onlineMembersChatConectIds) 
             await Groups.AddToGroupAsync(member, chat.Id);
+
+        onlineMembersChatConectIds.Remove(Context.ConnectionId);
 
         //await Clients.Clients(onlineMembersChatConectIds).SendAsync("onAddChat", chat);
         // отправляем чат всем его участникам кроме вызвавшего создание
