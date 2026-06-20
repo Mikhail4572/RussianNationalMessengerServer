@@ -46,7 +46,6 @@ public class RNMHub : Hub
                 return list;
             });
 
-
         await base.OnConnectedAsync();
     }
 
@@ -71,6 +70,79 @@ public class RNMHub : Hub
         }
 
         await base.OnDisconnectedAsync(exception);
+    }
+
+    public async Task CreateChat(Message firstMessage, string groupName, string[] members)
+    {
+        if (firstMessage is null)
+            return;
+
+        firstMessage.Id = Guid.NewGuid().ToString();
+        firstMessage.SentAt = DateTime.UtcNow;
+
+        if (_context.Accounts.Find(x => members.Contains(x.Id)).Count() != members.Length)
+            return;
+
+        Chat chat = new()
+        {
+            Id = Guid.NewGuid().ToString(),
+            Name = (groupName == "") ? null : groupName,
+            IsGroup = !string.IsNullOrEmpty(groupName),
+            CreatedAt = DateTime.UtcNow,
+            Members = [.. members],
+            LastMessage = new()
+            {
+                MessageId = firstMessage.Id,
+                Author = firstMessage.Author,
+                Content = firstMessage.Content,
+                SentAt = firstMessage.SentAt
+            }
+        };
+
+        await _context.Chats.InsertOneAsync(chat);
+
+        await _context.Messages.InsertOneAsync(new()
+        {
+            Id = firstMessage.Id,
+            Author = firstMessage.Author,
+            Content = firstMessage.Content,
+            ChatId = chat.Id,
+            IsDeleted = false,
+            IsEdited = false,
+            SentAt = firstMessage.SentAt
+        });
+
+        var onlineMembersChatConectIds = _connections.Where(x => members.Contains(x.Key)).SelectMany(x => x.Value).ToList();
+
+        onlineMembersChatConectIds.Remove(Context.ConnectionId);
+
+        // добавляем пользователей в чат
+        foreach (var member in onlineMembersChatConectIds) 
+            await Groups.AddToGroupAsync(member, chat.Id);
+
+        //await Clients.Clients(onlineMembersChatConectIds).SendAsync("onAddChat", chat);
+        // отправляем чат всем его участникам кроме вызвавшего создание
+        await Clients.Clients(onlineMembersChatConectIds).SendAsync("onChats", new List<Chat> { chat });
+
+        var oldChatId = firstMessage.ChatId;
+        firstMessage.ChatId = chat.Id;
+        // отправляем создателю чата, chatId который дал клиент, сам чат и последнее сообщение в нём
+        await Clients.Caller.SendAsync("onCreateChat", oldChatId, chat, firstMessage);
+    }
+
+    public async Task GetUsersByName(string name)
+    {
+        // .Project(x => x.Id) = List<T>.Select(x => x.Id)
+
+        var username = Context.User?.FindFirst(ClaimTypes.Name)?.Value;
+
+        if (string.IsNullOrEmpty(username))
+            return;
+
+        var users = await _context.Accounts.Find(x => x.Username.Contains(name, StringComparison.CurrentCultureIgnoreCase)
+            && x.Username != username).Limit(20).ToListAsync();
+
+        await Clients.Caller.SendAsync("onSearchUsers", users);
     }
 
     public async Task RemoveMessage(string messageId, string chatId)
@@ -123,8 +195,6 @@ public class RNMHub : Hub
 
         await Clients.Caller.SendAsync("onChats", userChats);
     }
-
-
 
     public async Task SendMessage(Message message)
     {
