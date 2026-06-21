@@ -153,6 +153,7 @@ public class RNMHub : Hub
 
         var oldChatId = firstMessage.ChatId;
         firstMessage.ChatId = chat.Id;
+
         // отправляем создателю чата, chatId который дал клиент, сам чат и последнее сообщение в нём
         await Clients.Client(Context.ConnectionId).SendAsync("onCreateChat", oldChatId, chat, firstMessage);
     }
@@ -184,17 +185,22 @@ public class RNMHub : Hub
         if (chat is null)
             return;
 
-        var lastMessage = await _context.Messages.Find(x => x.ChatId == chatId).SortByDescending(x => x.SentAt).FirstOrDefaultAsync();
+        var isLastMessage = (await _context.Chats.Find(x => x.Id == chatId).FirstOrDefaultAsync())?.LastMessage?.MessageId == messageId;
 
-        LastMessage? message = lastMessage is null ? null : new()
+        if (isLastMessage)
         {
-            MessageId = lastMessage.Id,
-            Content = lastMessage.Content,
-            Author = lastMessage.Author,
-            SentAt = lastMessage.SentAt
-        };
+            var lastMessage = await _context.Messages.Find(x => x.ChatId == chatId).SortByDescending(x => x.SentAt).FirstOrDefaultAsync();
 
-        await _context.Chats.UpdateOneAsync(x => x.Id == chatId, Builders<Chat>.Update.Set(x => x.LastMessage, message));
+            LastMessage? message = lastMessage is null ? null : new()
+            {
+                MessageId = lastMessage.Id,
+                Content = lastMessage.Content,
+                Author = lastMessage.Author,
+                SentAt = lastMessage.SentAt
+            };
+
+            await _context.Chats.UpdateOneAsync(x => x.Id == chatId, Builders<Chat>.Update.Set(x => x.LastMessage, message));
+        }
 
         await Clients.Group(chat.Id).SendAsync("onRemoveMessage", chat.Id, messageId);
     }
