@@ -21,21 +21,31 @@ public class LoginController : ControllerBase
     }
 
     [HttpPost("login")]
-    public async Task<IActionResult> LoginAsync([FromBody] LoginDto loginDto)
+    public async Task<IResult> LoginAsync([FromBody] LoginDto loginDto)
     {
-        if(!ModelState.IsValid)
-            return BadRequest(ModelState);
+        if (!ModelState.IsValid)
+        {
+            return Results.Problem(
+                title: "Некорректный JSON",
+                statusCode: StatusCodes.Status400BadRequest
+                );
+        }
 
         var user = await _context.Accounts.Find(x => x.Username == loginDto.UserName && x.PasswordHash == loginDto.Password).FirstOrDefaultAsync();
 
         if (user is null)
-            return StatusCode(401, "Неверный логин или пароль");
+        {
+            return Results.Problem(
+                title: "Неверный логин или пароль",
+                statusCode: StatusCodes.Status401Unauthorized);
+        }
 
         var token = _authService.GenerateJwtToken(user);
 
         user.PasswordHash = "";
 
-        return Ok(new LoginResponseDto
+
+        return Results.Ok(new LoginResponseDto
         {
             Token = token,
             User = user

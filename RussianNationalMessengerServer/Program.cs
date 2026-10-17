@@ -3,6 +3,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using RussianNationalMessengerServer.Models;
 using RussianNationalMessengerServer.Services;
+using RussianNationalMessengerServer.Services.ChatHub;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -88,6 +89,8 @@ builder.Services.AddAuthentication(x =>
 });
 
 builder.Services.AddSignalR();
+builder.Services.AddProblemDetails();
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -97,6 +100,7 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseExceptionHandler();
 
 //аутентификация - кто зашёл?
 app.UseAuthentication();

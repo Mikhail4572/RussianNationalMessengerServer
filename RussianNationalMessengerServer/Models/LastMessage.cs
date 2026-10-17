@@ -8,7 +8,7 @@ public class LastMessage
 {
     [BsonId]
     [JsonPropertyName("messageId")]
-    public string MessageId { get; set; }
+    public string MessageId { get; set; } = Guid.NewGuid().ToString();
 
     [BsonElement("author")]
     [JsonPropertyName("author")]
