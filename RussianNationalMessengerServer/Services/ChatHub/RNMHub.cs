@@ -1,8 +1,10 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using Amazon.S3;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using MongoDB.Driver;
 using RussianNationalMessengerServer.Dtos;
 using RussianNationalMessengerServer.Models;
+using RussianNationalMessengerServer.Services.AmazonService;
 using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.RegularExpressions;
@@ -16,9 +18,12 @@ public partial class RNMHub : Hub
     // username -> connection devices ConnectionId
     private static readonly ConcurrentDictionary<string, List<string>> _connections = [];
     private readonly MongoService _context;
-
-    public RNMHub(MongoService context) =>
+    private readonly IFileServices _fileServices;
+    public RNMHub(MongoService context, IFileServices fileServices)
+    {
+        _fileServices = fileServices;
         _context = context;
+    }
 
     public override async Task OnConnectedAsync()
     {

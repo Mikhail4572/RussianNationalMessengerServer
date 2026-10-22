@@ -27,6 +27,10 @@ public class Message
     [JsonPropertyName("sentAt")]
     public DateTime SentAt { get; set; } = DateTime.UtcNow;
 
+    [BsonElement("attachments")]
+    [JsonPropertyName("attachments")]
+    public List<Attachment>? Attachments { get; set; } = null;
+
     [BsonElement("isEdited")]
     [JsonPropertyName("isEdited")]
     public bool IsEdited { get; set; } = false;

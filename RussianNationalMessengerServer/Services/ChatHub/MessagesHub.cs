@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using RussianNationalMessengerServer.Dtos;
 using RussianNationalMessengerServer.Models;
 using System.Security.Claims;
 
@@ -41,7 +42,8 @@ public partial class RNMHub
         await Clients.Group(chat.Id).SendAsync("onRemoveMessage", chat.Id, messageId);
     }
 
-    public async Task SendMessage(Message message)
+    //----------------------------------------------------------------------------------------------------------------------------------------------
+    public async Task SendMessage(SendMessageDto messageDto)
     {
         var user_id = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
@@ -49,34 +51,44 @@ public partial class RNMHub
             return;
 
         // Проверка: пользователь в чате?
-        var isMember = await _context.Chats.Find(x => x.Id == message.ChatId && x.Members.Contains(user_id)).AnyAsync();
+        var isMember = await _context.Chats.Find(x => x.Id == messageDto.ChatId && x.Members.Contains(user_id)).AnyAsync();
 
         if (!isMember)
             return;
 
-        message.Id = Guid.NewGuid().ToString();
-        message.ChatId = message.ChatId;
-        message.Author = user_id;
-        message.SentAt = DateTime.UtcNow;
-        message.IsDeleted = false;
-        message.IsEdited = false;
+        List<Attachment>? attachments = null;
 
-        await _context.Messages.InsertOneAsync(message);
+        if (messageDto.Attachments is not null && messageDto.Attachments.Count > 0) 
+        {
+            var taskLoadFiles = messageDto.Attachments.Select(async x => await _fileServices.UploadFile(x));
 
-        await _context.Chats.UpdateOneAsync(x => x.Id == message.ChatId,
+            attachments = (await Task.WhenAll(taskLoadFiles)).Where(x => x != null).ToList()!;
+        }
+
+        Message add = new()
+        {
+            Id = Guid.NewGuid().ToString(),
+            Author = user_id,
+            ChatId = messageDto.ChatId,
+            Content = messageDto.Content ?? string.Empty,
+            Attachments = attachments
+        };
+
+         await _context.Messages.InsertOneAsync(add);
+
+        await _context.Chats.UpdateOneAsync(x => x.Id == add.ChatId,
             Builders<Chat>.Update.Set(x => x.LastMessage, new()
             {
                 Author = user_id,
-                Content = message.Content,
-                MessageId = message.Id,
-                SentAt = message.SentAt,
+                Content = add.Content,
+                MessageId = add.Id,
+                SentAt = add.SentAt,
             })
         );
 
         // отправка всем в чате
-        await Clients.Group(message.ChatId).SendAsync("onMessage", message);
+        await Clients.Group(add.ChatId).SendAsync("onMessage", add);
     }
-
 
     public async Task GetMessages(string chatId)
     {

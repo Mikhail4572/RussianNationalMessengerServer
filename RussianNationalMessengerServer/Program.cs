@@ -1,8 +1,11 @@
+using Amazon.S3;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using RussianNationalMessengerServer.Models;
 using RussianNationalMessengerServer.Services;
+using RussianNationalMessengerServer.Services.AmazonService;
 using RussianNationalMessengerServer.Services.ChatHub;
 using System.Text;
 
@@ -32,21 +35,36 @@ builder.Services.AddSwaggerGen(x =>
 });
 
 //подключаем БД (контекст)
-//builder.Services.AddScoped<RNMContext>(x => new());
-//builder.Services.AddDbContextFactory<RNMContext>();
 builder.Services.Configure<MongoDbSettings>(builder.Configuration.GetSection("MongoDbSettings"));
 
 builder.Services.AddSingleton<MongoService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 
+builder.Services.Configure<AmazonConfig>(builder.Configuration.GetSection("AmazonS3Client"));
+
+//подкючаем сервера амазона для файлов
+builder.Services.AddSingleton<IAmazonS3>(serviceProvider =>
+{
+    IOptions<AmazonConfig> options = serviceProvider.GetRequiredService<IOptions<AmazonConfig>>();
+    AmazonConfig config = options.Value;
+
+    return new AmazonS3Client(config.KeyID, config.ApplicationKey, 
+        new AmazonS3Config()
+        {
+            ServiceURL = config.ClientConfig.ServiceURL,
+            ForcePathStyle = true
+        }
+    );
+});
+
+// Сервис файлов
+builder.Services.AddScoped<IFileServices, FileServices>();
+
+
 var jwtSettings = builder.Configuration.GetSection("JwtSettings").Get<JwtSettings>();
 
-if (jwtSettings == null)
-{
-    Console.WriteLine(nameof(jwtSettings) + " is null");
-    return;
-}
+ArgumentNullException.ThrowIfNull(jwtSettings, nameof(jwtSettings));
 
 var key = Encoding.UTF8.GetBytes(jwtSettings.Key);
 builder.Services.AddAuthentication(x =>
@@ -68,7 +86,6 @@ builder.Services.AddAuthentication(x =>
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero
     };
-
 
     x.Events = new JwtBearerEvents
     {
