@@ -29,8 +29,7 @@ public class LoginController : ControllerBase
         {
             return Results.Problem(
                 title: "Некорректный JSON",
-                statusCode: StatusCodes.Status400BadRequest
-                );
+                statusCode: StatusCodes.Status400BadRequest);
         }
 
         var user = await _context.Accounts.Find(x => x.Username == loginDto.UserName && x.PasswordHash == loginDto.Password).FirstOrDefaultAsync();

@@ -58,7 +58,7 @@ public partial class RNMHub
 
         List<Attachment>? attachments = null;
 
-        if (messageDto.Attachments is not null && messageDto.Attachments.Count > 0) 
+        if (messageDto.Attachments is not null && messageDto.Attachments.Count > 0)
         {
             var taskLoadFiles = messageDto.Attachments.Select(async x => await _fileServices.UploadFile(x));
 
@@ -74,7 +74,7 @@ public partial class RNMHub
             Attachments = attachments
         };
 
-         await _context.Messages.InsertOneAsync(add);
+        await _context.Messages.InsertOneAsync(add);
 
         await _context.Chats.UpdateOneAsync(x => x.Id == add.ChatId,
             Builders<Chat>.Update.Set(x => x.LastMessage, new()
