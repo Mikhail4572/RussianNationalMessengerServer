@@ -16,7 +16,7 @@ public class LastMessage
 
     [BsonElement("content")]
     [JsonPropertyName("content")]
-    public string Content { get; set; }
+    public string? Content { get; set; }
 
     [BsonElement("sentAt")]
     [JsonPropertyName("sentAt")]

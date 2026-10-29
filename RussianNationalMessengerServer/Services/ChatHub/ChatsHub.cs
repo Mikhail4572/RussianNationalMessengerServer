@@ -114,7 +114,7 @@ public partial class RNMHub
         firstMessage.ChatId = chat.Id;
 
         // отправляем создателю чата, chatId который дал клиент, сам чат и последнее сообщение в нём
-        await Clients.Client(Context.ConnectionId).SendAsync("onCreateChat", chat, firstMessage);
+        await Clients.Caller.SendAsync("onCreateChat", chat, firstMessage);
     }
 
 }

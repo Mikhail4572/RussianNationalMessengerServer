@@ -20,22 +20,21 @@ public class FileServices : IFileServices
     public async Task<Attachment?> UploadFile(IFormFile file, CancellationToken token = default)
     {
         string key = Guid.NewGuid().ToString();
+        string fileName = Guid.NewGuid() + Path.GetExtension(file.FileName);
 
-        await using (var stream = file.OpenReadStream())
+        PutObjectRequest request = new()
         {
-            PutObjectRequest request = new()
-            {
-                BucketName = _amazonConfig.ContainerName,
-                Key = key,
-                InputStream = stream,
-                ContentType = file.ContentType
-            };
+            BucketName = _amazonConfig.ContainerName,
+            Key = fileName,
+            InputStream = file.OpenReadStream(),
+            ContentType = file.ContentType
+        };
 
-            var result = await _s3Client.PutObjectAsync(request, token);
+        var result = await _s3Client.PutObjectAsync(request, token);
 
-            if (result.HttpStatusCode != HttpStatusCode.OK)
-                return null;
-        }
+        if (result.HttpStatusCode != HttpStatusCode.OK)
+            return null;
+
 
         return new()
         {

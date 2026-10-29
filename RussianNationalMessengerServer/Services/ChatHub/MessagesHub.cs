@@ -9,7 +9,6 @@ namespace RussianNationalMessengerServer.Services.ChatHub;
 
 public partial class RNMHub
 {
-
     public async Task RemoveMessage(string messageId, string chatId)
     {
         if (!_context.Messages.Find(x => x.Id == messageId).Any())

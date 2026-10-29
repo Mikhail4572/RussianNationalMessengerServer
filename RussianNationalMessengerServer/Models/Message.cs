@@ -21,7 +21,7 @@ public class Message
 
     [BsonElement("content")]
     [JsonPropertyName("content")]
-    public string Content { get; set; }
+    public string? Content { get; set; }
 
     [BsonElement("sentAt")]
     [JsonPropertyName("sentAt")]
@@ -31,11 +31,11 @@ public class Message
     [JsonPropertyName("attachments")]
     public List<Attachment>? Attachments { get; set; } = null;
 
-    [BsonElement("isEdited")]
-    [JsonPropertyName("isEdited")]
-    public bool IsEdited { get; set; } = false;
+    //[BsonElement("isEdited")]
+    //[JsonPropertyName("isEdited")]
+    //public bool IsEdited { get; set; } = false;
 
-    [BsonElement("isDeleted")]
-    [JsonPropertyName("isDeleted")]
-    public bool IsDeleted { get; set; } = false;
+    //[BsonElement("isDeleted")]
+    //[JsonPropertyName("isDeleted")]
+    //public bool IsDeleted { get; set; } = false;
 }
